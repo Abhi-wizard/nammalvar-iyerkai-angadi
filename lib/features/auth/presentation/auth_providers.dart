@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/auth_repository.dart';
 import '../domain/profile_model.dart';
@@ -22,9 +23,11 @@ class AuthNotifier extends StateNotifier<ProfileModel?> {
     return profile != null;
   }
 
-  void switchSeller(ProfileModel profile) {
-    _repo.switchActiveSeller(profile);
-    state = profile;
+  void switchSellerInDebug(ProfileModel profile) {
+    if (kDebugMode) {
+      _repo.switchActiveSellerInDebug(profile);
+      state = profile;
+    }
   }
 
   Future<void> signOut() async {

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Nammalvar Iyerkai Angadi - Complete Supabase Database Schema
+-- Nammalvar Iyerkai Angadi - Hardened Supabase Database Schema
 -- Migration: 00001_initial_schema.sql
 -- ============================================================================
 
@@ -79,7 +79,8 @@ CREATE TABLE IF NOT EXISTS public.products (
     minimum_stock NUMERIC(12, 3) NOT NULL DEFAULT 5 CHECK (minimum_stock >= 0),
     status product_status NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_products_name UNIQUE (name)
 );
 
 -- Sales table
@@ -203,19 +204,35 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_product ON public.sale_items(product_i
 CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON public.stock_movements(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_created ON public.stock_movements(created_at);
 
--- 4. ATOMIC CONCURRENCY-SAFE STORED PROCEDURES (RPCs)
+-- 4. HELPER FUNCTIONS
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid() AND role = 'admin' AND is_active = true
+    );
+$$;
 
--- Process Sale (Pessimistic Row Locking FOR UPDATE to prevent race conditions)
+-- 5. ATOMIC CONCURRENCY-SAFE STORED PROCEDURES (RPCs)
+
+-- Process Sale (Pessimistic Row Locking FOR UPDATE + Server-side auth.uid() enforcement)
 CREATE OR REPLACE FUNCTION public.process_sale(
-    p_seller_id UUID,
     p_payment_method payment_method,
     p_items JSONB
 )
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
+    v_seller_id UUID;
+    v_seller_profile RECORD;
     v_sale_id UUID;
     v_total_amount NUMERIC(12, 2) := 0;
     v_total_cost NUMERIC(12, 2) := 0;
@@ -228,17 +245,31 @@ DECLARE
     v_new_stock NUMERIC(12, 3);
     v_sale_num BIGINT;
 BEGIN
-    -- Check items array
+    -- 1. Derive authenticated seller identity strictly from Supabase Auth
+    v_seller_id := auth.uid();
+    IF v_seller_id IS NULL THEN
+        RAISE EXCEPTION 'Unauthorized: User must be authenticated to record a sale.';
+    END IF;
+
+    SELECT * INTO v_seller_profile
+    FROM public.profiles
+    WHERE id = v_seller_id AND is_active = true;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Forbidden: Active profile not found for authenticated user.';
+    END IF;
+
+    -- 2. Validate items
     IF jsonb_array_length(p_items) = 0 THEN
         RAISE EXCEPTION 'Sale must contain at least one item.';
     END IF;
 
-    -- Create Sale Header
+    -- 3. Create Sale Header
     INSERT INTO public.sales (seller_id, total_amount, total_cost_amount, payment_method, status)
-    VALUES (p_seller_id, 0, 0, p_payment_method, 'completed')
+    VALUES (v_seller_id, 0, 0, p_payment_method, 'completed')
     RETURNING id, sale_number INTO v_sale_id, v_sale_num;
 
-    -- Process each item atomically
+    -- 4. Process each item atomically with row locking
     FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
     LOOP
         v_product_id := (v_item->>'product_id')::UUID;
@@ -293,38 +324,52 @@ BEGIN
             reference_id, reason, performed_by
         ) VALUES (
             v_product_id, 'sale', -v_qty, v_new_stock,
-            v_sale_id, 'Sale #' || v_sale_num, p_seller_id
+            v_sale_id, 'Sale #' || v_sale_num, v_seller_id
         );
     END LOOP;
 
-    -- Update final totals in sale header
+    -- 5. Update final totals in sale header
     UPDATE public.sales
     SET total_amount = v_total_amount, total_cost_amount = v_total_cost
     WHERE id = v_sale_id;
 
-    -- Log activity
+    -- 6. Log activity
     INSERT INTO public.activity_logs (user_id, action, entity_type, entity_id, details)
-    VALUES (p_seller_id, 'CREATE_SALE', 'sale', v_sale_id, jsonb_build_object('sale_number', v_sale_num, 'total', v_total_amount));
+    VALUES (v_seller_id, 'CREATE_SALE', 'sale', v_sale_id, jsonb_build_object('sale_number', v_sale_num, 'total', v_total_amount));
 
     RETURN v_sale_id;
 END;
 $$;
 
--- Cancel Sale (Restores stock atomically and records reason)
+-- Cancel Sale (Restores stock atomically + Server-side Admin Authorization)
 CREATE OR REPLACE FUNCTION public.cancel_sale(
     p_sale_id UUID,
-    p_admin_id UUID,
     p_reason TEXT
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
+    v_admin_id UUID;
     v_sale RECORD;
     v_item RECORD;
     v_new_stock NUMERIC(12, 3);
 BEGIN
+    v_admin_id := auth.uid();
+    IF v_admin_id IS NULL THEN
+        RAISE EXCEPTION 'Unauthorized: User must be authenticated.';
+    END IF;
+
+    IF NOT public.is_admin() THEN
+        RAISE EXCEPTION 'Forbidden: Only admin users can cancel sales.';
+    END IF;
+
+    IF p_reason IS NULL OR trim(p_reason) = '' THEN
+        RAISE EXCEPTION 'Mandatory cancellation reason required.';
+    END IF;
+
     SELECT * INTO v_sale FROM public.sales WHERE id = p_sale_id FOR UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Sale not found.';
@@ -348,46 +393,56 @@ BEGIN
             reference_id, reason, performed_by
         ) VALUES (
             v_item.product_id, 'sale_cancel', v_item.quantity, v_new_stock,
-            p_sale_id, 'Cancellation of Sale #' || v_sale.sale_number || ': ' || COALESCE(p_reason, 'No reason specified'),
-            p_admin_id
+            p_sale_id, 'Cancellation of Sale #' || v_sale.sale_number || ': ' || p_reason,
+            v_admin_id
         );
     END LOOP;
 
     -- Update Sale Header to cancelled
     UPDATE public.sales
     SET status = 'cancelled',
-        cancelled_by = p_admin_id,
+        cancelled_by = v_admin_id,
         cancelled_at = now(),
         cancellation_reason = p_reason
     WHERE id = p_sale_id;
 
     -- Log activity
     INSERT INTO public.activity_logs (user_id, action, entity_type, entity_id, details)
-    VALUES (p_admin_id, 'CANCEL_SALE', 'sale', p_sale_id, jsonb_build_object('sale_number', v_sale.sale_number, 'reason', p_reason));
+    VALUES (v_admin_id, 'CANCEL_SALE', 'sale', p_sale_id, jsonb_build_object('sale_number', v_sale.sale_number, 'reason', p_reason));
 
     RETURN true;
 END;
 $$;
 
--- Receive Stock (Inward purchase / manual addition)
+-- Receive Stock (Inward purchase / manual addition + Admin Authorization)
 CREATE OR REPLACE FUNCTION public.receive_stock(
     p_product_id UUID,
     p_quantity NUMERIC(12, 3),
     p_cost_price NUMERIC(12, 2),
     p_supplier_id UUID,
     p_invoice_number TEXT,
-    p_user_id UUID,
     p_notes TEXT
 )
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
+    v_admin_id UUID;
     v_purchase_id UUID;
     v_item_amount NUMERIC(12, 2);
     v_new_stock NUMERIC(12, 3);
 BEGIN
+    v_admin_id := auth.uid();
+    IF v_admin_id IS NULL THEN
+        RAISE EXCEPTION 'Unauthorized: User must be authenticated.';
+    END IF;
+
+    IF NOT public.is_admin() THEN
+        RAISE EXCEPTION 'Forbidden: Only admin users can receive stock.';
+    END IF;
+
     IF p_quantity <= 0 THEN
         RAISE EXCEPTION 'Quantity must be greater than zero.';
     END IF;
@@ -396,7 +451,7 @@ BEGIN
 
     -- Create Purchase record
     INSERT INTO public.purchases (supplier_id, invoice_number, total_amount, created_by)
-    VALUES (p_supplier_id, p_invoice_number, v_item_amount, p_user_id)
+    VALUES (p_supplier_id, p_invoice_number, v_item_amount, v_admin_id)
     RETURNING id INTO v_purchase_id;
 
     INSERT INTO public.purchase_items (purchase_id, product_id, quantity, cost_price, amount)
@@ -417,28 +472,42 @@ BEGIN
     ) VALUES (
         p_product_id, 'purchase', p_quantity, v_new_stock,
         v_purchase_id, COALESCE(p_notes, 'Stock Received / Purchase Invoice: ' || COALESCE(p_invoice_number, 'N/A')),
-        p_user_id
+        v_admin_id
     );
 
     RETURN v_purchase_id;
 END;
 $$;
 
--- Adjust Stock (Physical correction)
+-- Adjust Stock (Physical correction + Admin Authorization)
 CREATE OR REPLACE FUNCTION public.adjust_stock(
     p_product_id UUID,
     p_adjustment_delta NUMERIC(12, 3),
-    p_user_id UUID,
     p_reason TEXT
 )
 RETURNS NUMERIC(12, 3)
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
+    v_admin_id UUID;
     v_current_stock NUMERIC(12, 3);
     v_new_stock NUMERIC(12, 3);
 BEGIN
+    v_admin_id := auth.uid();
+    IF v_admin_id IS NULL THEN
+        RAISE EXCEPTION 'Unauthorized: User must be authenticated.';
+    END IF;
+
+    IF NOT public.is_admin() THEN
+        RAISE EXCEPTION 'Forbidden: Only admin users can adjust stock.';
+    END IF;
+
+    IF p_reason IS NULL OR trim(p_reason) = '' THEN
+        RAISE EXCEPTION 'Mandatory adjustment reason required.';
+    END IF;
+
     SELECT current_stock INTO v_current_stock
     FROM public.products
     WHERE id = p_product_id
@@ -464,14 +533,43 @@ BEGIN
         reason, performed_by
     ) VALUES (
         p_product_id, 'adjustment', p_adjustment_delta, v_new_stock,
-        COALESCE(p_reason, 'Physical Stock Adjustment'), p_user_id
+        p_reason, v_admin_id
     );
 
     RETURN v_new_stock;
 END;
 $$;
 
--- 5. ROW LEVEL SECURITY (RLS)
+-- Price Change Trigger Function
+CREATE OR REPLACE FUNCTION public.track_product_price_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    IF (OLD.selling_price <> NEW.selling_price) OR (OLD.cost_price <> NEW.cost_price) THEN
+        INSERT INTO public.price_history (
+            product_id, old_selling_price, new_selling_price,
+            old_cost_price, new_cost_price, changed_by, changed_at
+        ) VALUES (
+            NEW.id, OLD.selling_price, NEW.selling_price,
+            OLD.cost_price, NEW.cost_price,
+            COALESCE(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid),
+            now()
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_track_price_change ON public.products;
+CREATE TRIGGER trg_track_price_change
+BEFORE UPDATE ON public.products
+FOR EACH ROW
+EXECUTE FUNCTION public.track_product_price_change();
+
+-- 6. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -484,19 +582,6 @@ ALTER TABLE public.purchases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
-
--- Helper function to check if caller is admin
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN
-LANGUAGE sql
-SECURITY DEFINER
-STABLE
-AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE id = auth.uid() AND role = 'admin' AND is_active = true
-    );
-$$;
 
 -- Policies for profiles
 CREATE POLICY "Profiles read by authenticated users" ON public.profiles
@@ -563,7 +648,7 @@ CREATE POLICY "Expenses managed by admin" ON public.expenses
 CREATE POLICY "Activity logs read by admin" ON public.activity_logs
     FOR SELECT TO authenticated USING (public.is_admin());
 
--- 6. ENABLE REALTIME PUBLICATION
+-- 7. ENABLE REALTIME PUBLICATION
 ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.sales;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;

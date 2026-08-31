@@ -16,18 +16,19 @@ class SalesRepository {
   int _localSaleSequence = 1001;
 
   SalesRepository(this._productRepo) {
-    _seedInitialSales();
+    if (kDebugMode) {
+      _seedInitialSales();
+    }
     _initSupabaseSync();
   }
 
   void _seedInitialSales() {
-    // Seed initial demo sales matching BPD scenarios
     final now = DateTime.now();
     _sales.add(
       SaleModel(
         id: 'sale-1001',
         saleNumber: 1001,
-        sellerId: '00000000-0000-0000-0000-000000000002', // Seller 1
+        sellerId: '00000000-0000-0000-0000-000000000002',
         sellerName: 'Seller 1 (Murugan)',
         saleDate: now.subtract(const Duration(hours: 3)),
         totalAmount: 300.0,
@@ -56,7 +57,7 @@ class SalesRepository {
       SaleModel(
         id: 'sale-1002',
         saleNumber: 1002,
-        sellerId: '00000000-0000-0000-0000-000000000003', // Seller 2
+        sellerId: '00000000-0000-0000-0000-000000000003',
         sellerName: 'Seller 2 (Kavitha)',
         saleDate: now.subtract(const Duration(hours: 2)),
         totalAmount: 240.0,
@@ -81,36 +82,7 @@ class SalesRepository {
       ),
     );
 
-    _sales.add(
-      SaleModel(
-        id: 'sale-1003',
-        saleNumber: 1003,
-        sellerId: '00000000-0000-0000-0000-000000000004', // Seller 3
-        sellerName: 'Seller 3 (Selvam)',
-        saleDate: now.subtract(const Duration(minutes: 45)),
-        totalAmount: 300.0,
-        totalCostAmount: 237.5,
-        paymentMethod: 'upi',
-        status: 'completed',
-        createdAt: now.subtract(const Duration(minutes: 45)),
-        items: [
-          SaleItemModel(
-            id: 'item-3',
-            saleId: 'sale-1003',
-            productId: 'prod-01',
-            productNameSnapshot: 'Thuyamali Rice',
-            unitSnapshot: 'kg',
-            quantity: 2.5,
-            rateSnapshot: 120.0,
-            costPriceSnapshot: 95.0,
-            amount: 300.0,
-            createdAt: now.subtract(const Duration(minutes: 45)),
-          ),
-        ],
-      ),
-    );
-
-    _localSaleSequence = 1004;
+    _localSaleSequence = 1003;
   }
 
   void _initSupabaseSync() {
@@ -137,7 +109,7 @@ class SalesRepository {
 
   Future<List<SaleModel>> getSales() async {
     final client = SupabaseService.client;
-    if (client != null) {
+    if (client != null && client.auth.currentSession != null) {
       try {
         final res = await client
             .from('sales')
@@ -160,33 +132,31 @@ class SalesRepository {
     await getSales();
   }
 
-  /// Atomic Sale Processing
+  /// Secure Atomic Sale Processing
   Future<SaleModel> processSale({
-    required String sellerId,
-    required String sellerName,
     required String paymentMethod,
     required List<CartItemModel> cartItems,
+    String? fallbackSellerId,
+    String? fallbackSellerName,
   }) async {
     if (cartItems.isEmpty) {
       throw Exception('Cart is empty. Add at least one item.');
     }
 
     final client = SupabaseService.client;
-    if (client != null) {
+    if (client != null && client.auth.currentSession != null) {
       try {
         final itemsPayload = cartItems.map((item) => item.toRpcJson()).toList();
 
-        // Call Supabase Atomic Stored Procedure
+        // Server-side RPC derives seller from auth.uid()
         final saleId = await client.rpc(
           'process_sale',
           params: {
-            'p_seller_id': sellerId,
             'p_payment_method': paymentMethod,
             'p_items': itemsPayload,
           },
         );
 
-        // Refresh live product stock and sales
         await _productRepo.refreshProducts();
         await refreshSales();
 
@@ -197,7 +167,14 @@ class SalesRepository {
       }
     }
 
-    // Local / In-Memory Atomic Execution Fallback
+    if (!kDebugMode) {
+      throw Exception('Unauthorized: User must be signed in to perform sales.');
+    }
+
+    // Local / Debug mode fallback
+    final sellerId = fallbackSellerId ?? '00000000-0000-0000-0000-000000000002';
+    final sellerName = fallbackSellerName ?? 'Debug Seller';
+
     double totalAmount = 0;
     double totalCost = 0;
     final List<SaleItemModel> saleItems = [];
@@ -228,7 +205,6 @@ class SalesRepository {
         ),
       );
 
-      // Deduct stock locally
       await _productRepo.updateStockDirectly(item.product.id, -item.quantity);
     }
 
@@ -251,22 +227,25 @@ class SalesRepository {
     return newSale;
   }
 
-  /// Atomic Sale Cancellation
+  /// Secure Atomic Sale Cancellation
   Future<bool> cancelSale({
     required String saleId,
-    required String adminId,
-    required String adminName,
     required String reason,
+    String? fallbackAdminId,
+    String? fallbackAdminName,
   }) async {
+    if (reason.trim().isEmpty) {
+      throw Exception('Mandatory cancellation reason required.');
+    }
+
     final client = SupabaseService.client;
-    if (client != null) {
+    if (client != null && client.auth.currentSession != null) {
       try {
         await client.rpc(
           'cancel_sale',
           params: {
             'p_sale_id': saleId,
-            'p_admin_id': adminId,
-            'p_reason': reason,
+            'p_reason': reason.trim(),
           },
         );
         await _productRepo.refreshProducts();
@@ -276,6 +255,10 @@ class SalesRepository {
         debugPrint('Supabase cancel_sale error: $e');
         rethrow;
       }
+    }
+
+    if (!kDebugMode) {
+      throw Exception('Unauthorized: User must be signed in as Admin.');
     }
 
     final index = _sales.indexWhere((s) => s.id == saleId);
@@ -288,15 +271,14 @@ class SalesRepository {
       throw Exception('Sale is already cancelled.');
     }
 
-    // Restore stock locally
     for (final item in sale.items) {
       await _productRepo.updateStockDirectly(item.productId, item.quantity);
     }
 
     final cancelledSale = sale.copyWith(
       status: 'cancelled',
-      cancelledBy: adminId,
-      cancelledByName: adminName,
+      cancelledBy: fallbackAdminId ?? '00000000-0000-0000-0000-000000000001',
+      cancelledByName: fallbackAdminName ?? 'Admin',
       cancelledAt: DateTime.now(),
       cancellationReason: reason,
     );

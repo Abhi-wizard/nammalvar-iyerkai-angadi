@@ -528,10 +528,10 @@ class _CheckoutModalSheetState extends ConsumerState<_CheckoutModalSheet> {
     try {
       final salesRepo = ref.read(salesRepositoryProvider);
       final sale = await salesRepo.processSale(
-        sellerId: widget.sellerId,
-        sellerName: widget.sellerName,
         paymentMethod: _selectedPayment,
         cartItems: widget.cartItems,
+        fallbackSellerId: widget.sellerId,
+        fallbackSellerName: widget.sellerName,
       );
 
       ref.read(cartProvider.notifier).clearCart();

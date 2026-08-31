@@ -300,8 +300,8 @@ class _StockScreenState extends ConsumerState<StockScreen> with SingleTickerProv
                       quantity: qty,
                       costPrice: cost,
                       invoiceNumber: invoiceController.text.trim(),
-                      userId: currentProfile?.id ?? '00000000-0000-0000-0000-000000000001',
-                      userName: currentProfile?.name ?? 'Admin',
+                      fallbackUserId: currentProfile?.id,
+                      fallbackUserName: currentProfile?.name,
                     );
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -384,9 +384,9 @@ class _StockScreenState extends ConsumerState<StockScreen> with SingleTickerProv
                     productName: product.name,
                     unit: product.unit,
                     adjustmentDelta: delta,
-                    userId: currentProfile?.id ?? '00000000-0000-0000-0000-000000000001',
-                    userName: currentProfile?.name ?? 'Admin',
                     reason: reason,
+                    fallbackUserId: currentProfile?.id,
+                    fallbackUserName: currentProfile?.name,
                   );
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(

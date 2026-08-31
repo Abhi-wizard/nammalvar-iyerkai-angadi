@@ -3,7 +3,7 @@ import '../../../core/network/supabase_service.dart';
 import '../domain/profile_model.dart';
 
 class AuthRepository {
-  // Pre-configured seller profiles matching BPD
+  // Pre-configured profiles used solely in debug / unit test mode
   static final List<ProfileModel> mockProfiles = [
     ProfileModel(
       id: '00000000-0000-0000-0000-000000000001',
@@ -47,51 +47,84 @@ class AuthRepository {
     ),
   ];
 
-  ProfileModel? _currentProfile = mockProfiles[0]; // Defaults to Admin for ease of test
+  ProfileModel? _currentProfile;
 
   ProfileModel? get currentProfile => _currentProfile;
+
+  AuthRepository() {
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    final client = SupabaseService.client;
+    if (client != null && client.auth.currentSession != null) {
+      final user = client.auth.currentUser;
+      if (user != null) {
+        await fetchProfileById(user.id);
+      }
+    }
+  }
+
+  Future<ProfileModel?> fetchProfileById(String userId) async {
+    final client = SupabaseService.client;
+    if (client != null) {
+      try {
+        final profileData = await client
+            .from('profiles')
+            .select()
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (profileData != null) {
+          _currentProfile = ProfileModel.fromJson(profileData);
+          return _currentProfile;
+        }
+      } catch (e) {
+        debugPrint('Error fetching profile from Supabase: $e');
+      }
+    }
+    return null;
+  }
 
   Future<ProfileModel?> signInWithEmail(String email, String password) async {
     final client = SupabaseService.client;
     if (client != null) {
-      try {
-        final response = await client.auth.signInWithPassword(
-          email: email.trim(),
-          password: password,
-        );
-        if (response.user != null) {
-          final profileData = await client
-              .from('profiles')
-              .select()
-              .eq('id', response.user!.id)
-              .maybeSingle();
+      final response = await client.auth.signInWithPassword(
+        email: email.trim(),
+        password: password,
+      );
 
-          if (profileData != null) {
-            _currentProfile = ProfileModel.fromJson(profileData);
-            return _currentProfile;
-          }
+      if (response.user != null) {
+        final profile = await fetchProfileById(response.user!.id);
+        if (profile == null) {
+          throw Exception('User profile not found in database. Contact Admin.');
         }
-      } catch (e) {
-        debugPrint('Supabase Auth error: $e. Falling back to local seller matching.');
+        if (!profile.isActive) {
+          await client.auth.signOut();
+          throw Exception('This seller account has been deactivated.');
+        }
+        return profile;
       }
     }
 
-    // Local / Demo mode fallback
-    final matched = mockProfiles.firstWhere(
-      (p) => p.email?.toLowerCase() == email.trim().toLowerCase(),
-      orElse: () => ProfileModel(
-        id: 'mock-${DateTime.now().millisecondsSinceEpoch}',
-        name: email.split('@').first,
-        email: email,
-        role: email.toLowerCase().contains('admin') ? UserRole.admin : UserRole.seller,
-        createdAt: DateTime.now(),
-      ),
-    );
-    _currentProfile = matched;
-    return _currentProfile;
+    // In debug mode only, allow matching mock users for local testing
+    if (kDebugMode) {
+      final matched = mockProfiles.firstWhere(
+        (p) => p.email?.toLowerCase() == email.trim().toLowerCase(),
+        orElse: () => throw Exception('Invalid credentials in local debug mode.'),
+      );
+      _currentProfile = matched;
+      return _currentProfile;
+    }
+
+    throw Exception('Supabase is not connected and production authentication failed.');
   }
 
-  void switchActiveSeller(ProfileModel profile) {
+  /// Strictly gated for debug/test mode
+  void switchActiveSellerInDebug(ProfileModel profile) {
+    if (!kDebugMode) {
+      throw Exception('Seller switching is prohibited in production builds.');
+    }
     _currentProfile = profile;
   }
 
@@ -112,7 +145,7 @@ class AuthRepository {
         final res = await client.from('profiles').select().order('name');
         return (res as List).map((e) => ProfileModel.fromJson(e)).toList();
       } catch (e) {
-        debugPrint('Error fetching profiles from Supabase: $e');
+        debugPrint('Error fetching profiles: $e');
       }
     }
     return mockProfiles;

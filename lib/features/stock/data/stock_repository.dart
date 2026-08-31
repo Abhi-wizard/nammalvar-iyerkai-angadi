@@ -14,7 +14,9 @@ class StockRepository {
   final _movementsController = StreamController<List<StockMovementModel>>.broadcast();
 
   StockRepository(this._productRepo) {
-    _seedInitialMovements();
+    if (kDebugMode) {
+      _seedInitialMovements();
+    }
     _initSupabaseSync();
   }
 
@@ -47,19 +49,6 @@ class StockRepository {
         unit: 'piece',
         createdAt: now.subtract(const Duration(days: 2)),
       ),
-      StockMovementModel(
-        id: 'mov-3',
-        productId: 'prod-23',
-        movementType: 'opening_stock',
-        quantity: 50.0,
-        balanceAfter: 50.0,
-        reason: 'Initial Opening Stock from BPD Catalog',
-        performedBy: '00000000-0000-0000-0000-000000000001',
-        performedByName: 'Admin',
-        productName: 'Sembaruthi Shampoo',
-        unit: 'bottle',
-        createdAt: now.subtract(const Duration(days: 2)),
-      ),
     ]);
   }
 
@@ -87,7 +76,7 @@ class StockRepository {
 
   Future<List<StockMovementModel>> getMovements() async {
     final client = SupabaseService.client;
-    if (client != null) {
+    if (client != null && client.auth.currentSession != null) {
       try {
         final res = await client
             .from('stock_movements')
@@ -110,7 +99,7 @@ class StockRepository {
     await getMovements();
   }
 
-  /// Receive Inward Stock
+  /// Receive Inward Stock (Admin authorization enforced)
   Future<void> receiveStock({
     required String productId,
     required String productName,
@@ -118,8 +107,8 @@ class StockRepository {
     required double quantity,
     required double costPrice,
     String? invoiceNumber,
-    required String userId,
-    required String userName,
+    String? fallbackUserId,
+    String? fallbackUserName,
     String? notes,
   }) async {
     if (quantity <= 0) {
@@ -127,7 +116,7 @@ class StockRepository {
     }
 
     final client = SupabaseService.client;
-    if (client != null) {
+    if (client != null && client.auth.currentSession != null) {
       try {
         await client.rpc(
           'receive_stock',
@@ -137,7 +126,6 @@ class StockRepository {
             'p_cost_price': costPrice,
             'p_supplier_id': null,
             'p_invoice_number': invoiceNumber,
-            'p_user_id': userId,
             'p_notes': notes,
           },
         );
@@ -150,9 +138,12 @@ class StockRepository {
       }
     }
 
+    if (!kDebugMode) {
+      throw Exception('Unauthorized: User must be signed in as Admin.');
+    }
+
     // Local in-memory execution
     await _productRepo.updateStockDirectly(productId, quantity);
-
     final products = await _productRepo.getProducts();
     final product = products.firstWhere((p) => p.id == productId);
 
@@ -163,8 +154,8 @@ class StockRepository {
       quantity: quantity,
       balanceAfter: product.currentStock,
       reason: notes ?? 'Stock Received / Purchase Invoice: ${invoiceNumber ?? 'N/A'}',
-      performedBy: userId,
-      performedByName: userName,
+      performedBy: fallbackUserId ?? '00000000-0000-0000-0000-000000000001',
+      performedByName: fallbackUserName ?? 'Admin',
       productName: productName,
       unit: unit,
       createdAt: DateTime.now(),
@@ -174,26 +165,29 @@ class StockRepository {
     _movementsController.add(List.unmodifiable(_movements));
   }
 
-  /// Physical Stock Adjustment
+  /// Physical Stock Adjustment (Admin authorization enforced)
   Future<void> adjustStock({
     required String productId,
     required String productName,
     required String unit,
     required double adjustmentDelta,
-    required String userId,
-    required String userName,
+    String? fallbackUserId,
+    String? fallbackUserName,
     required String reason,
   }) async {
+    if (reason.trim().isEmpty) {
+      throw Exception('Mandatory adjustment reason required.');
+    }
+
     final client = SupabaseService.client;
-    if (client != null) {
+    if (client != null && client.auth.currentSession != null) {
       try {
         await client.rpc(
           'adjust_stock',
           params: {
             'p_product_id': productId,
             'p_adjustment_delta': adjustmentDelta,
-            'p_user_id': userId,
-            'p_reason': reason,
+            'p_reason': reason.trim(),
           },
         );
         await _productRepo.refreshProducts();
@@ -205,9 +199,12 @@ class StockRepository {
       }
     }
 
+    if (!kDebugMode) {
+      throw Exception('Unauthorized: User must be signed in as Admin.');
+    }
+
     // Local in-memory execution
     await _productRepo.updateStockDirectly(productId, adjustmentDelta);
-
     final products = await _productRepo.getProducts();
     final product = products.firstWhere((p) => p.id == productId);
 
@@ -218,8 +215,8 @@ class StockRepository {
       quantity: adjustmentDelta,
       balanceAfter: product.currentStock,
       reason: reason,
-      performedBy: userId,
-      performedByName: userName,
+      performedBy: fallbackUserId ?? '00000000-0000-0000-0000-000000000001',
+      performedByName: fallbackUserName ?? 'Admin',
       productName: productName,
       unit: unit,
       createdAt: DateTime.now(),

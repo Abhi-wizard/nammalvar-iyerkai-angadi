@@ -278,9 +278,9 @@ class _SaleDetailsSheetState extends ConsumerState<_SaleDetailsSheet> {
                 final salesRepo = ref.read(salesRepositoryProvider);
                 await salesRepo.cancelSale(
                   saleId: widget.sale.id,
-                  adminId: widget.currentProfile.id,
-                  adminName: widget.currentProfile.name,
                   reason: reason,
+                  fallbackAdminId: widget.currentProfile?.id,
+                  fallbackAdminName: widget.currentProfile?.name,
                 );
 
                 if (!mounted) return;

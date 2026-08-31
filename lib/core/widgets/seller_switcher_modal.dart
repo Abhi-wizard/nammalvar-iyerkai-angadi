@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,11 @@ class SellerSwitcherModal extends ConsumerWidget {
   const SellerSwitcherModal({super.key});
 
   static void show(BuildContext context) {
+    if (!kDebugMode) {
+      debugPrint('SellerSwitcherModal is disabled in release/production builds.');
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -19,6 +25,10 @@ class SellerSwitcherModal extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!kDebugMode) {
+      return const SizedBox.shrink();
+    }
+
     final currentProfile = ref.watch(currentProfileProvider);
     final profiles = AuthRepository.mockProfiles;
 
@@ -48,10 +58,10 @@ class SellerSwitcherModal extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
+                  color: const Color(0xFFFFF3E0),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.people_alt_outlined, color: AppColors.primary),
+                child: const Icon(Icons.bug_report_outlined, color: AppColors.warning),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -59,7 +69,7 @@ class SellerSwitcherModal extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Switch Active Seller / User',
+                      'Debug Multi-Seller Switcher',
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -67,10 +77,11 @@ class SellerSwitcherModal extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      'Simulate the 4 mobile devices & Admin simultaneously',
+                      'DEVELOPMENT ONLY • Hidden in production builds',
                       style: GoogleFonts.outfit(
-                        fontSize: 13,
-                        color: AppColors.textSecondaryLight,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.warning,
                       ),
                     ),
                   ],
@@ -94,11 +105,11 @@ class SellerSwitcherModal extends ConsumerWidget {
               child: ListTile(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 onTap: () {
-                  ref.read(currentProfileProvider.notifier).switchSeller(profile);
+                  ref.read(currentProfileProvider.notifier).switchSellerInDebug(profile);
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Switched active user to: ${profile.name}'),
+                      content: Text('Switched active debug user to: ${profile.name}'),
                       backgroundColor: AppColors.primary,
                       duration: const Duration(seconds: 2),
                     ),

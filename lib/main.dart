@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_constants.dart';
 import 'core/network/supabase_service.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/presentation/auth_providers.dart';
+import 'features/auth/presentation/login_screen.dart';
 import 'features/dashboard/presentation/main_navigation_shell.dart';
 
 void main() async {
@@ -16,16 +18,20 @@ void main() async {
   );
 }
 
-class NammalvarApp extends StatelessWidget {
+class NammalvarApp extends ConsumerWidget {
   const NammalvarApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentProfile = ref.watch(currentProfileProvider);
+
     return MaterialApp(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const MainNavigationShell(),
+      home: currentProfile == null
+          ? const LoginScreen()
+          : const MainNavigationShell(),
     );
   }
 }
