@@ -1,11 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
-import '../../../core/widgets/seller_switcher_modal.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../expenses/presentation/expense_providers.dart';
 import '../../products/presentation/product_providers.dart';
@@ -41,14 +39,6 @@ class AdminDashboard extends ConsumerWidget {
             ),
           ],
         ),
-        actions: [
-          if (kDebugMode)
-            IconButton(
-              tooltip: 'Switch User (Debug)',
-              icon: const Icon(Icons.bug_report_outlined, color: AppColors.warning),
-              onPressed: () => SellerSwitcherModal.show(context),
-            ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),

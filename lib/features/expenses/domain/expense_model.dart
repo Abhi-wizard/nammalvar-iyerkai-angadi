@@ -1,3 +1,5 @@
+import '../../auth/domain/profile_model.dart';
+
 class ExpenseModel {
   final String id;
   final String category;
@@ -22,19 +24,23 @@ class ExpenseModel {
   });
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
+    final profileMap = json['profiles'] as Map<String, dynamic>?;
+    final rawName = profileMap != null ? profileMap['name'] as String? : null;
+    final rawEmail = profileMap != null ? profileMap['email'] as String? : null;
+
     return ExpenseModel(
       id: json['id'] as String,
       category: json['category'] as String,
       description: json['description'] as String?,
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       expenseDate: json['expense_date'] != null
-          ? DateTime.parse(json['expense_date'] as String)
+          ? DateTime.parse(json['expense_date'] as String).toLocal()
           : DateTime.now(),
       createdBy: json['created_by'] as String,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.parse(json['created_at'] as String).toLocal()
           : DateTime.now(),
-      createdByName: json['profiles'] != null ? json['profiles']['name'] as String? : null,
+      createdByName: ProfileModel.normalizeDisplayName(rawName, rawEmail),
     );
   }
 

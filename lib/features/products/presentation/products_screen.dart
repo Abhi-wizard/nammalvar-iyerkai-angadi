@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
-import '../../../core/widgets/seller_switcher_modal.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../domain/product_model.dart';
 import 'product_providers.dart';
@@ -43,11 +42,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Switch User',
-            icon: const Icon(Icons.switch_account_outlined, color: AppColors.primary),
-            onPressed: () => SellerSwitcherModal.show(context),
-          ),
           if (isAdmin)
             IconButton(
               tooltip: 'Add Product',
@@ -181,6 +175,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 children: [
                   Text(
                     product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.outfit(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -188,7 +184,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         '${Formatters.currency(product.sellingPrice)} / ${product.unit}',
@@ -198,8 +197,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                           color: AppColors.primary,
                         ),
                       ),
-                      if (isAdmin && product.costPrice > 0) ...[
-                        const SizedBox(width: 8),
+                      if (isAdmin && product.costPrice > 0)
                         Text(
                           '(Cost: ${Formatters.currency(product.costPrice)})',
                           style: GoogleFonts.outfit(
@@ -207,7 +205,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                             color: AppColors.textSecondaryLight,
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],

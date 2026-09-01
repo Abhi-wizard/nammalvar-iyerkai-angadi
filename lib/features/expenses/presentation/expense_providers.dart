@@ -19,9 +19,10 @@ final todayExpensesTotalProvider = Provider<double>((ref) {
   return expensesAsync.maybeWhen(
     data: (expenses) {
       return expenses.where((e) {
-        return e.expenseDate.year == now.year &&
-            e.expenseDate.month == now.month &&
-            e.expenseDate.day == now.day;
+        final eDate = e.expenseDate.toLocal();
+        return eDate.year == now.year &&
+            eDate.month == now.month &&
+            eDate.day == now.day;
       }).fold(0.0, (sum, item) => sum + item.amount);
     },
     orElse: () => 0.0,

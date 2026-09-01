@@ -5,7 +5,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
-import '../../../core/widgets/seller_switcher_modal.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../products/domain/product_model.dart';
 import '../../products/presentation/product_providers.dart';
@@ -49,13 +48,6 @@ class _StockScreenState extends ConsumerState<StockScreen> with SingleTickerProv
           'Stock & Inventory',
           style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Switch User',
-            icon: const Icon(Icons.switch_account_outlined, color: AppColors.primary),
-            onPressed: () => SellerSwitcherModal.show(context),
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,

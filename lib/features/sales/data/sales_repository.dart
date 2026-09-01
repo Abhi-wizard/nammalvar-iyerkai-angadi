@@ -15,6 +15,8 @@ class SalesRepository {
   final _salesController = StreamController<List<SaleModel>>.broadcast();
   int _localSaleSequence = 1001;
 
+  RealtimeChannel? _realtimeChannel;
+
   SalesRepository(this._productRepo) {
     final client = SupabaseService.client;
     if (client != null) {
@@ -26,7 +28,7 @@ class SalesRepository {
   void _initSupabaseSync() {
     final client = SupabaseService.client;
     if (client != null) {
-      client
+      _realtimeChannel = client
           .channel('public:sales')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
@@ -51,13 +53,15 @@ class SalesRepository {
       try {
         final res = await client
             .from('sales')
-            .select('*, profiles:seller_id(name), cancelled_by_profile:cancelled_by(name), sale_items(*)')
+            .select('*, profiles:seller_id(name, email), cancelled_by_profile:cancelled_by(name, email), sale_items(*)')
             .order('created_at', ascending: false);
 
         final fetched = (res as List).map((e) => SaleModel.fromJson(e)).toList();
         _sales.clear();
         _sales.addAll(fetched);
-        _salesController.add(List.unmodifiable(_sales));
+        if (!_salesController.isClosed) {
+          _salesController.add(List.unmodifiable(_sales));
+        }
         return _sales;
       } catch (e) {
         debugPrint('Error fetching sales from Supabase: $e');
@@ -68,6 +72,13 @@ class SalesRepository {
 
   Future<void> refreshSales() async {
     await getSales();
+  }
+
+  void dispose() {
+    if (_realtimeChannel != null) {
+      SupabaseService.client?.removeChannel(_realtimeChannel!);
+    }
+    _salesController.close();
   }
 
   /// Secure Atomic Sale Processing

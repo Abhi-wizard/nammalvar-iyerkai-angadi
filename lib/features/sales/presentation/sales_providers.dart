@@ -6,7 +6,11 @@ import '../../auth/presentation/auth_providers.dart';
 
 final salesRepositoryProvider = Provider<SalesRepository>((ref) {
   final productRepo = ref.watch(productRepositoryProvider);
-  return SalesRepository(productRepo);
+  final repo = SalesRepository(productRepo);
+  ref.onDispose(() {
+    repo.dispose();
+  });
+  return repo;
 });
 
 final salesStreamProvider = StreamProvider<List<SaleModel>>((ref) {
@@ -48,12 +52,13 @@ final visibleSalesProvider = Provider<List<SaleModel>>((ref) {
           }
         }
 
-        // Date filter
+        // Date filter (local timezone match)
         if (dateFilter != null) {
-          final sDate = sale.saleDate;
-          if (sDate.year != dateFilter.year ||
-              sDate.month != dateFilter.month ||
-              sDate.day != dateFilter.day) {
+          final sDate = sale.saleDate.toLocal();
+          final dDate = dateFilter.toLocal();
+          if (sDate.year != dDate.year ||
+              sDate.month != dDate.month ||
+              sDate.day != dDate.day) {
             return false;
           }
         }
@@ -96,7 +101,7 @@ class StoreMetrics {
 
 final todayStoreMetricsProvider = Provider<StoreMetrics>((ref) {
   final salesAsync = ref.watch(salesStreamProvider);
-  final now = DateTime.now();
+  final now = DateTime.now(); // local device time
 
   return salesAsync.maybeWhen(
     data: (sales) {
@@ -114,7 +119,7 @@ final todayStoreMetricsProvider = Provider<StoreMetrics>((ref) {
       for (final sale in sales) {
         if (!sale.isCompleted) continue; // ignore cancelled sales for revenue
 
-        final sDate = sale.saleDate;
+        final sDate = sale.saleDate.toLocal();
         final isToday = sDate.year == now.year && sDate.month == now.month && sDate.day == now.day;
 
         if (isToday) {
@@ -178,7 +183,7 @@ final currentSellerMetricsProvider = Provider<StoreMetrics>((ref) {
         if (!sale.isCompleted) continue;
         if (sale.sellerId != currentProfile.id) continue;
 
-        final sDate = sale.saleDate;
+        final sDate = sale.saleDate.toLocal();
         final isToday = sDate.year == now.year && sDate.month == now.month && sDate.day == now.day;
 
         if (isToday) {

@@ -1,3 +1,5 @@
+import '../../auth/domain/profile_model.dart';
+
 class SaleItemModel {
   final String id;
   final String saleId;
@@ -35,7 +37,7 @@ class SaleItemModel {
       costPriceSnapshot: (json['cost_price_snapshot'] as num?)?.toDouble() ?? 0.0,
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.parse(json['created_at'] as String).toLocal()
           : DateTime.now(),
     );
   }
@@ -101,12 +103,20 @@ class SaleModel {
         .map((e) => SaleItemModel.fromJson(e as Map<String, dynamic>))
         .toList();
 
+    final profileMap = json['profiles'] as Map<String, dynamic>?;
+    final rawSellerName = profileMap != null ? profileMap['name'] as String? : null;
+    final rawSellerEmail = profileMap != null ? profileMap['email'] as String? : null;
+
+    final cancelledProfileMap = json['cancelled_by_profile'] as Map<String, dynamic>?;
+    final rawCancelledName = cancelledProfileMap != null ? cancelledProfileMap['name'] as String? : null;
+    final rawCancelledEmail = cancelledProfileMap != null ? cancelledProfileMap['email'] as String? : null;
+
     return SaleModel(
       id: json['id'] as String,
       saleNumber: json['sale_number'] as int? ?? 0,
       sellerId: json['seller_id'] as String,
       saleDate: json['sale_date'] != null
-          ? DateTime.parse(json['sale_date'] as String)
+          ? DateTime.parse(json['sale_date'] as String).toLocal()
           : DateTime.now(),
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
       totalCostAmount: (json['total_cost_amount'] as num?)?.toDouble() ?? 0.0,
@@ -114,16 +124,14 @@ class SaleModel {
       status: json['status'] as String? ?? 'completed',
       cancelledBy: json['cancelled_by'] as String?,
       cancelledAt: json['cancelled_at'] != null
-          ? DateTime.parse(json['cancelled_at'] as String)
+          ? DateTime.parse(json['cancelled_at'] as String).toLocal()
           : null,
       cancellationReason: json['cancellation_reason'] as String?,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.parse(json['created_at'] as String).toLocal()
           : DateTime.now(),
-      sellerName: json['profiles'] != null ? json['profiles']['name'] as String? : null,
-      cancelledByName: json['cancelled_by_profile'] != null
-          ? json['cancelled_by_profile']['name'] as String?
-          : null,
+      sellerName: ProfileModel.normalizeDisplayName(rawSellerName, rawSellerEmail),
+      cancelledByName: ProfileModel.normalizeDisplayName(rawCancelledName, rawCancelledEmail),
       items: parsedItems,
     );
   }

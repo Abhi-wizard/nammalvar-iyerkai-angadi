@@ -5,7 +5,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
-import '../../../core/widgets/seller_switcher_modal.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../products/domain/product_model.dart';
 import '../../products/presentation/product_providers.dart';
@@ -72,11 +71,6 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Switch Seller',
-            icon: const Icon(Icons.switch_account_outlined, color: AppColors.primary),
-            onPressed: () => SellerSwitcherModal.show(context),
-          ),
           if (cartItems.isNotEmpty)
             IconButton(
               tooltip: 'Clear Cart',
@@ -235,37 +229,44 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 
             // Middle Product Info
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: GoogleFonts.outfit(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimaryLight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimaryLight,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        '${Formatters.currency(product.sellingPrice)} / ${product.unit}',
-                        style: GoogleFonts.outfit(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                    const SizedBox(height: 3),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          '${Formatters.currency(product.sellingPrice)} / ${product.unit}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      StatusBadge.stock(
-                        stock: product.currentStock,
-                        minStock: product.minimumStock,
-                        unit: product.unit,
-                      ),
-                    ],
-                  ),
-                ],
+                        StatusBadge.stock(
+                          stock: product.currentStock,
+                          minStock: product.minimumStock,
+                          unit: product.unit,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -289,20 +290,22 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                             );
                       },
                       child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                         child: Icon(Icons.remove, size: 18, color: AppColors.primary),
                       ),
                     ),
                     GestureDetector(
                       onTap: () => _showQuantityDialog(context, product, cartItem.quantity),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        constraints: const BoxConstraints(minWidth: 26),
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                         color: AppColors.primaryContainer.withValues(alpha: 0.4),
                         child: Text(
                           Formatters.formatQuantity(cartItem.quantity, ''),
                           style: GoogleFonts.outfit(
                             fontWeight: FontWeight.w700,
-                            fontSize: 14,
+                            fontSize: 13,
                             color: AppColors.primary,
                           ),
                         ),
@@ -326,7 +329,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                             );
                       },
                       child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                         child: Icon(Icons.add, size: 18, color: AppColors.primary),
                       ),
                     ),

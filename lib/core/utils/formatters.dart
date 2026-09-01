@@ -23,8 +23,8 @@ class Formatters {
   }
 
   static String pdfCurrency(num? amount) {
-    if (amount == null) return 'Rs. 0.00';
-    return _currencyFormat.format(amount).replaceAll('₹', 'Rs. ');
+    if (amount == null) return '₹0.00';
+    return _currencyFormat.format(amount);
   }
 
   static String formatQuantity(num? quantity, String unit) {
@@ -38,17 +38,17 @@ class Formatters {
 
   static String formatDate(DateTime? date) {
     if (date == null) return '';
-    return DateFormat('dd MMM yyyy').format(date);
+    return DateFormat('dd MMM yyyy').format(date.toLocal());
   }
 
   static String formatTime(DateTime? date) {
     if (date == null) return '';
-    return DateFormat('hh:mm a').format(date);
+    return DateFormat('hh:mm a').format(date.toLocal());
   }
 
   static String formatDateTime(DateTime? date) {
     if (date == null) return '';
-    return DateFormat('dd MMM yyyy, hh:mm a').format(date);
+    return DateFormat('dd MMM yyyy, hh:mm a').format(date.toLocal());
   }
 
   static String formatSaleNumber(int? number) {

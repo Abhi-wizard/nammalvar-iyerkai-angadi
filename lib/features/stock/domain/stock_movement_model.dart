@@ -1,3 +1,5 @@
+import '../../auth/domain/profile_model.dart';
+
 class StockMovementModel {
   final String id;
   final String productId;
@@ -33,6 +35,10 @@ class StockMovementModel {
   bool get isOutward => quantity < 0;
 
   factory StockMovementModel.fromJson(Map<String, dynamic> json) {
+    final profileMap = json['profiles'] as Map<String, dynamic>?;
+    final rawName = profileMap != null ? profileMap['name'] as String? : null;
+    final rawEmail = profileMap != null ? profileMap['email'] as String? : null;
+
     return StockMovementModel(
       id: json['id'] as String,
       productId: json['product_id'] as String,
@@ -43,11 +49,11 @@ class StockMovementModel {
       reason: json['reason'] as String?,
       performedBy: json['performed_by'] as String,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.parse(json['created_at'] as String).toLocal()
           : DateTime.now(),
       productName: json['products'] != null ? json['products']['name'] as String? : null,
       unit: json['products'] != null ? json['products']['unit'] as String? : null,
-      performedByName: json['profiles'] != null ? json['profiles']['name'] as String? : null,
+      performedByName: ProfileModel.normalizeDisplayName(rawName, rawEmail),
     );
   }
 }

@@ -23,7 +23,7 @@ void main() {
       ProviderScope(
         overrides: [
           currentProfileProvider.overrideWith(
-            (ref) => AuthNotifier(ref.watch(authRepositoryProvider))
+            (ref) => AuthNotifier(ref.watch(authRepositoryProvider), ref)
               ..state = AuthRepository.mockProfiles[0],
           ),
         ],

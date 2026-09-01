@@ -144,5 +144,35 @@ void main() {
       final restoredProducts = await productRepo.getProducts();
       expect(restoredProducts.firstWhere((p) => p.id == product.id).currentStock, initialStock);
     });
+
+    test('8. Multi-seller transactions aggregate properly for Admin', () async {
+      final seller1 = AuthRepository.mockProfiles[1]; // Murugan
+      final seller2 = AuthRepository.mockProfiles[2]; // Kavitha
+
+      final products = await productRepo.getProducts();
+      final product = products.first;
+
+      final sale1 = await salesRepo.processSale(
+        paymentMethod: 'cash',
+        cartItems: [CartItemModel(product: product, quantity: 1.0)],
+        fallbackSellerId: seller1.id,
+        fallbackSellerName: seller1.name,
+      );
+
+      final sale2 = await salesRepo.processSale(
+        paymentMethod: 'upi',
+        cartItems: [CartItemModel(product: product, quantity: 2.0)],
+        fallbackSellerId: seller2.id,
+        fallbackSellerName: seller2.name,
+      );
+
+      final allSales = await salesRepo.getSales();
+      expect(allSales.any((s) => s.id == sale1.id), isTrue);
+      expect(allSales.any((s) => s.id == sale2.id), isTrue);
+
+      final sellerIds = allSales.map((s) => s.sellerId).toSet();
+      expect(sellerIds.contains(seller1.id), isTrue);
+      expect(sellerIds.contains(seller2.id), isTrue);
+    });
   });
 }

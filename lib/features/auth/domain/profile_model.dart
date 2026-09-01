@@ -22,18 +22,41 @@ class ProfileModel {
   bool get isAdmin => role == UserRole.admin;
   bool get isSeller => role == UserRole.seller;
 
+  static String normalizeDisplayName(String? name, String? email) {
+    if (email != null && email.toLowerCase().contains('stdharan73')) {
+      return 'Tharanidharan';
+    }
+    if (name != null) {
+      final trimmed = name.trim();
+      if (trimmed.toLowerCase().contains('stdharan73')) {
+        return 'Tharanidharan';
+      }
+      if (trimmed.isNotEmpty && trimmed.toLowerCase() != 'user' && trimmed.toLowerCase() != 'seller') {
+        return trimmed;
+      }
+    }
+    if (email != null && email.contains('@')) {
+      final local = email.split('@')[0];
+      if (local.toLowerCase() == 'stdharan73') return 'Tharanidharan';
+      return local;
+    }
+    return name ?? 'User';
+  }
+
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    final email = json['email'] as String?;
+    final rawName = json['name'] as String?;
     return ProfileModel(
       id: json['id'] as String,
-      name: json['name'] as String? ?? 'User',
+      name: normalizeDisplayName(rawName, email),
       phone: json['phone'] as String?,
-      email: json['email'] as String?,
+      email: email,
       role: (json['role'] as String? ?? 'seller').toLowerCase() == 'admin'
           ? UserRole.admin
           : UserRole.seller,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.parse(json['created_at'] as String).toLocal()
           : DateTime.now(),
     );
   }

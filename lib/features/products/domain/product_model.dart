@@ -54,10 +54,10 @@ class ProductModel {
       minimumStock: (json['minimum_stock'] as num?)?.toDouble() ?? 5.0,
       status: json['status'] as String? ?? 'active',
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.parse(json['created_at'] as String).toLocal()
           : DateTime.now(),
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
+          ? DateTime.parse(json['updated_at'] as String).toLocal()
           : DateTime.now(),
       categoryName: json['categories'] != null ? json['categories']['name'] as String? : null,
       subcategoryName: json['subcategories'] != null ? json['subcategories']['name'] as String? : null,

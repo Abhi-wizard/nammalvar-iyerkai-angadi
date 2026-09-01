@@ -21,6 +21,7 @@ class StatusBadge extends StatelessWidget {
     required double minStock,
     required String unit,
   }) {
+    final formattedQty = (stock % 1 == 0) ? stock.toInt().toString() : stock.toString();
     if (stock <= 0) {
       return const StatusBadge(
         label: 'Out of Stock',
@@ -30,14 +31,14 @@ class StatusBadge extends StatelessWidget {
       );
     } else if (stock <= minStock) {
       return StatusBadge(
-        label: 'Low: $stock $unit',
+        label: 'Low: $formattedQty $unit',
         backgroundColor: const Color(0xFFFFF3E0),
         textColor: AppColors.warning,
         icon: Icons.warning_amber_rounded,
       );
     } else {
       return StatusBadge(
-        label: '$stock $unit',
+        label: '$formattedQty $unit',
         backgroundColor: AppColors.primaryContainer,
         textColor: AppColors.primary,
         icon: Icons.inventory_2_outlined,
@@ -91,22 +92,22 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 13, color: textColor),
-            const SizedBox(width: 4),
+            Icon(icon, size: 12, color: textColor),
+            const SizedBox(width: 3),
           ],
           Text(
             label,
             style: GoogleFonts.outfit(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: textColor,
             ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/network/supabase_service.dart';
@@ -48,22 +49,73 @@ class AuthRepository {
     ),
   ];
 
+  final _profileController = StreamController<ProfileModel?>.broadcast();
+  StreamSubscription<AuthState>? _authSubscription;
   ProfileModel? _currentProfile;
+  bool _isInitialized = false;
 
+  bool get isInitialized => _isInitialized;
   ProfileModel? get currentProfile => _currentProfile;
+  Stream<ProfileModel?> get profileStream => _profileController.stream;
 
   AuthRepository() {
-    _restoreSession();
+    _initAuthListener();
   }
 
-  Future<void> _restoreSession() async {
+  void _initAuthListener() {
     final client = SupabaseService.client;
-    if (client != null && client.auth.currentSession != null) {
-      final user = client.auth.currentUser;
-      if (user != null) {
-        await fetchProfileById(user.id);
+    if (client != null) {
+      // 1. Check existing session immediately
+      final session = client.auth.currentSession;
+      if (session != null) {
+        fetchProfileById(session.user.id).then((profile) {
+          _currentProfile = profile;
+          _isInitialized = true;
+          if (!_profileController.isClosed) {
+            _profileController.add(_currentProfile);
+          }
+        });
+      } else {
+        _isInitialized = true;
+        if (!_profileController.isClosed) {
+          _profileController.add(null);
+        }
       }
+
+      // 2. Listen to Supabase auth events
+      _authSubscription = client.auth.onAuthStateChange.listen((data) async {
+        final event = data.event;
+        final session = data.session;
+        debugPrint('Supabase AuthStateChange: $event, userId: ${session?.user.id}');
+
+        if (event == AuthChangeEvent.signedIn ||
+            event == AuthChangeEvent.initialSession ||
+            event == AuthChangeEvent.tokenRefreshed ||
+            event == AuthChangeEvent.userUpdated) {
+          if (session?.user != null) {
+            final profile = await fetchProfileById(session!.user.id);
+            _currentProfile = profile;
+            _isInitialized = true;
+            if (!_profileController.isClosed) {
+              _profileController.add(_currentProfile);
+            }
+          }
+        } else if (event == AuthChangeEvent.signedOut) {
+          _currentProfile = null;
+          _isInitialized = true;
+          if (!_profileController.isClosed) {
+            _profileController.add(null);
+          }
+        }
+      });
+    } else {
+      _isInitialized = true;
     }
+  }
+
+  void dispose() {
+    _authSubscription?.cancel();
+    _profileController.close();
   }
 
   Future<ProfileModel?> fetchProfileById(String userId) async {
@@ -79,6 +131,21 @@ class AuthRepository {
         if (profileData != null) {
           _currentProfile = ProfileModel.fromJson(profileData);
           return _currentProfile;
+        } else {
+          final user = client.auth.currentUser;
+          if (user != null && user.id == userId) {
+            final email = user.email;
+            final metaName = user.userMetadata?['name'] as String? ?? user.userMetadata?['full_name'] as String?;
+            final name = ProfileModel.normalizeDisplayName(metaName, email);
+            _currentProfile = ProfileModel(
+              id: user.id,
+              name: name,
+              email: email,
+              role: UserRole.seller,
+              createdAt: DateTime.now(),
+            );
+            return _currentProfile;
+          }
         }
       } catch (e) {
         debugPrint('Error fetching profile from Supabase: $e');
@@ -91,7 +158,6 @@ class AuthRepository {
     final client = SupabaseService.client;
     
     if (client == null) {
-      // If client is completely unavailable (e.g. running in offline test harness)
       if (kDebugMode) {
         debugPrint('Supabase client unavailable, checking test profiles for offline development...');
         final matched = mockProfiles.firstWhere(
@@ -134,22 +200,24 @@ class AuthRepository {
     }
   }
 
-  /// Strictly gated for debug/test mode
-  void switchActiveSellerInDebug(ProfileModel profile) {
-    if (!kDebugMode) {
-      throw Exception('Seller switching is prohibited in production builds.');
-    }
-    _currentProfile = profile;
-  }
-
   Future<void> signOut() async {
     final client = SupabaseService.client;
     if (client != null) {
       try {
         await client.auth.signOut();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Supabase signOut error: $e');
+      }
     }
     _currentProfile = null;
+    if (!_profileController.isClosed) {
+      _profileController.add(null);
+    }
+  }
+
+  /// Strictly used for offline test harnesses
+  void switchActiveSellerInDebug(ProfileModel profile) {
+    _currentProfile = profile;
   }
 
   Future<List<ProfileModel>> getAllProfiles() async {
