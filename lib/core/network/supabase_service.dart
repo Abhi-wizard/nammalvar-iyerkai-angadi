@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../constants/app_constants.dart';
 
 class SupabaseConfig {
   static String? _url;
@@ -11,8 +12,18 @@ class SupabaseConfig {
 
   static Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _url = prefs.getString(_prefUrlKey) ?? const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
-    _anonKey = prefs.getString(_prefAnonKey) ?? const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+    
+    final storedUrl = prefs.getString(_prefUrlKey);
+    final envUrl = const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+    _url = (storedUrl != null && storedUrl.isNotEmpty)
+        ? storedUrl
+        : (envUrl.isNotEmpty ? envUrl : AppConstants.defaultSupabaseUrl);
+
+    final storedKey = prefs.getString(_prefAnonKey);
+    final envKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+    _anonKey = (storedKey != null && storedKey.isNotEmpty)
+        ? storedKey
+        : (envKey.isNotEmpty ? envKey : AppConstants.defaultSupabaseAnonKey);
 
     if (_url != null && _url!.isNotEmpty && _anonKey != null && _anonKey!.isNotEmpty) {
       try {
@@ -26,7 +37,7 @@ class SupabaseConfig {
         );
         debugPrint('Supabase initialized with live backend URL: $_url');
       } catch (e) {
-        debugPrint('Supabase init warning: $e');
+        debugPrint('Supabase init error: $e');
       }
     }
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -34,6 +35,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.dispose();
   }
 
+  Future<void> _handleSignOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out from this terminal?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('SIGN OUT'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await ref.read(currentProfileProvider.notifier).signOut();
+    }
+  }
+
   Future<void> _saveSupabaseCredentials() async {
     setState(() => _isSaving = true);
     try {
@@ -64,15 +91,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: Text(
-          'Settings & Cloud Sync',
+          'Settings & Account',
           style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Switch User',
-            icon: const Icon(Icons.switch_account_outlined, color: AppColors.primary),
-            onPressed: () => SellerSwitcherModal.show(context),
-          ),
+          if (kDebugMode)
+            IconButton(
+              tooltip: 'Debug Switcher',
+              icon: const Icon(Icons.bug_report_outlined, color: AppColors.warning),
+              onPressed: () => SellerSwitcherModal.show(context),
+            ),
         ],
       ),
       body: ListView(
@@ -80,14 +108,84 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           // Current User Card
           AppCard(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: currentProfile?.isAdmin == true ? AppColors.secondary : AppColors.primary,
+                      child: Text(
+                        (currentProfile?.name ?? 'U').substring(0, 1).toUpperCase(),
+                        style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentProfile?.name ?? 'Authenticated User',
+                            style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Role: ${currentProfile?.role.name.toUpperCase()}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: currentProfile?.isAdmin == true ? AppColors.secondary : AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            currentProfile?.email ?? '',
+                            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondaryLight),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _handleSignOut,
+                    icon: const Icon(Icons.logout, color: AppColors.error, size: 18),
+                    label: Text(
+                      'SIGN OUT FROM TERMINAL',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.error,
+                        fontSize: 13,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.error),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Cloud Sync Status Card
+          AppCard(
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: currentProfile?.isAdmin == true ? AppColors.secondary : AppColors.primary,
-                  child: Text(
-                    (currentProfile?.name ?? 'U').substring(0, 1).toUpperCase(),
-                    style: const TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isLiveConnected ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isLiveConnected ? Icons.cloud_done : Icons.cloud_off,
+                    color: isLiveConnected ? AppColors.success : AppColors.warning,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -96,125 +194,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        currentProfile?.name ?? 'User',
-                        style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700),
+                        'Cloud Sync Status',
+                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700),
                       ),
                       Text(
-                        'Role: ${currentProfile?.role.name.toUpperCase()} • ${currentProfile?.email ?? ""}',
-                        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondaryLight),
+                        isLiveConnected
+                            ? 'Connected to Supabase PostgreSQL'
+                            : 'Offline / Connecting...',
+                        style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondaryLight),
                       ),
                     ],
                   ),
                 ),
-                OutlinedButton(
-                  onPressed: () => SellerSwitcherModal.show(context),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(80, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isLiveConnected ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text('SWITCH', style: TextStyle(fontSize: 12)),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Supabase Connection Status Card
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          isLiveConnected ? Icons.cloud_done : Icons.cloud_queue,
-                          color: isLiveConnected ? AppColors.success : AppColors.warning,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Supabase Cloud Backend',
-                          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700),
-                        ),
-                      ],
+                  child: Text(
+                    isLiveConnected ? 'LIVE' : 'OFFLINE',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isLiveConnected ? AppColors.success : AppColors.warning,
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isLiveConnected ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isLiveConnected ? 'CONNECTED' : 'LOCAL MOCK / READY',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isLiveConnected ? AppColors.success : AppColors.warning,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 20),
-                Text(
-                  'Central PostgreSQL Database URL',
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _urlController,
-                  decoration: const InputDecoration(
-                    hintText: 'https://xxxxxxxxxxxxxx.supabase.co',
-                    prefixIcon: Icon(Icons.link, size: 20),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Supabase Anon Key (Public Key)',
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _anonKeyController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    hintText: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-                    prefixIcon: Icon(Icons.vpn_key_outlined, size: 20),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.save_outlined),
-                  label: _isSaving
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white))
-                      : const Text('CONNECT / SAVE CREDENTIALS'),
-                  onPressed: _isSaving ? null : _saveSupabaseCredentials,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Database Migrations Info Card
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.storage_outlined, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Text('SQL Migrations Ready', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Schema & seed files are stored in:\n• supabase/migrations/00001_initial_schema.sql\n• supabase/migrations/00002_seed_data.sql',
-                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondaryLight),
                 ),
               ],
             ),
@@ -229,11 +234,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Text(AppConstants.appName, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.primary)),
                 Text(AppConstants.appTagline, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondaryLight)),
-                const SizedBox(height: 8),
-                Text('Multi-device version: 2.0 (Production Ready)', style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondaryLight)),
+                const Divider(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('System Architecture', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondaryLight)),
+                    Text('Multi-Terminal POS', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('App Version', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondaryLight)),
+                    Text('2.1.0 (Production)', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ],
             ),
           ),
+
+          // Developer Controls (Gated exclusively to Debug Builds)
+          if (kDebugMode) ...[
+            const SizedBox(height: 20),
+            ExpansionTile(
+              title: Text(
+                'Developer Tools (Debug Mode Only)',
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.warning),
+              ),
+              leading: const Icon(Icons.code, color: AppColors.warning),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _urlController,
+                        decoration: const InputDecoration(labelText: 'Supabase URL'),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _anonKeyController,
+                        obscureText: true,
+                        decoration: const InputDecoration(labelText: 'Anon Key'),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: _isSaving ? null : _saveSupabaseCredentials,
+                        child: const Text('RECONNECT CLIENT'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/network/supabase_service.dart';
 import '../domain/profile_model.dart';
 
@@ -88,7 +89,23 @@ class AuthRepository {
 
   Future<ProfileModel?> signInWithEmail(String email, String password) async {
     final client = SupabaseService.client;
-    if (client != null) {
+    
+    if (client == null) {
+      // If client is completely unavailable (e.g. running in offline test harness)
+      if (kDebugMode) {
+        debugPrint('Supabase client unavailable, checking test profiles for offline development...');
+        final matched = mockProfiles.firstWhere(
+          (p) => p.email?.toLowerCase() == email.trim().toLowerCase(),
+          orElse: () => throw Exception('Supabase client is not initialized and user not found in local test profiles.'),
+        );
+        _currentProfile = matched;
+        return _currentProfile;
+      }
+      throw Exception('Supabase service is not initialized. Please check network connection.');
+    }
+
+    try {
+      debugPrint('Attempting Supabase Auth signInWithPassword for: ${email.trim()}');
       final response = await client.auth.signInWithPassword(
         email: email.trim(),
         password: password,
@@ -97,27 +114,24 @@ class AuthRepository {
       if (response.user != null) {
         final profile = await fetchProfileById(response.user!.id);
         if (profile == null) {
-          throw Exception('User profile not found in database. Contact Admin.');
+          throw Exception('User profile record not found in public.profiles. Please assign profile in Supabase.');
         }
         if (!profile.isActive) {
           await client.auth.signOut();
-          throw Exception('This seller account has been deactivated.');
+          throw Exception('This account has been deactivated. Please contact store owner.');
         }
-        return profile;
+        _currentProfile = profile;
+        return _currentProfile;
       }
-    }
 
-    // In debug mode only, allow matching mock users for local testing
-    if (kDebugMode) {
-      final matched = mockProfiles.firstWhere(
-        (p) => p.email?.toLowerCase() == email.trim().toLowerCase(),
-        orElse: () => throw Exception('Invalid credentials in local debug mode.'),
-      );
-      _currentProfile = matched;
-      return _currentProfile;
+      throw Exception('Authentication failed: No user returned from Supabase Auth.');
+    } on AuthException catch (e) {
+      debugPrint('Supabase AuthException -> code: ${e.code}, statusCode: ${e.statusCode}, message: ${e.message}');
+      throw Exception(e.message);
+    } catch (e) {
+      debugPrint('Authentication unexpected error: $e');
+      rethrow;
     }
-
-    throw Exception('Supabase is not connected and production authentication failed.');
   }
 
   /// Strictly gated for debug/test mode

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -41,11 +42,12 @@ class AdminDashboard extends ConsumerWidget {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Switch User',
-            icon: const Icon(Icons.switch_account_outlined, color: AppColors.primary),
-            onPressed: () => SellerSwitcherModal.show(context),
-          ),
+          if (kDebugMode)
+            IconButton(
+              tooltip: 'Switch User (Debug)',
+              icon: const Icon(Icons.bug_report_outlined, color: AppColors.warning),
+              onPressed: () => SellerSwitcherModal.show(context),
+            ),
         ],
       ),
       body: ListView(

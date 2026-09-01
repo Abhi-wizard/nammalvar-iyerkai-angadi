@@ -9,62 +9,60 @@ import '../domain/product_model.dart';
 class ProductRepository {
   final _uuid = const Uuid();
 
-  // In-memory initial categories matching BPD
-  static final List<CategoryModel> initialCategories = [
-    CategoryModel(id: 'cat-rice', name: 'Rice & Cereals', displayOrder: 1, createdAt: DateTime(2026, 1, 1)),
-    CategoryModel(id: 'cat-mercury', name: 'Mercury Naturals', displayOrder: 2, createdAt: DateTime(2026, 1, 1)),
-    CategoryModel(id: 'sub-soaps', name: 'Soaps', parentId: 'cat-mercury', displayOrder: 1, createdAt: DateTime(2026, 1, 1)),
-    CategoryModel(id: 'sub-haircare', name: 'Hair Care', parentId: 'cat-mercury', displayOrder: 2, createdAt: DateTime(2026, 1, 1)),
-    CategoryModel(id: 'sub-cleaning', name: 'Cleaning Products', parentId: 'cat-mercury', displayOrder: 3, createdAt: DateTime(2026, 1, 1)),
+  // Test fallback categories for offline unit tests
+  static final List<CategoryModel> testFallbackCategories = [
+    CategoryModel(id: '00000000-0000-0000-0001-000000000001', name: 'Rice & Cereals', displayOrder: 1, createdAt: DateTime(2026, 1, 1)),
+    CategoryModel(id: '00000000-0000-0000-0001-000000000002', name: 'Mercury Naturals', displayOrder: 2, createdAt: DateTime(2026, 1, 1)),
   ];
 
-  // In-memory initial products matching BPD
-  static final List<ProductModel> initialProducts = [
-    // Rice & Cereals
-    ProductModel(id: 'prod-01', name: 'Thuyamali Rice', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 120.0, costPrice: 95.0, currentStock: 200.0, minimumStock: 25.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-02', name: 'Karuppukavani Rice', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 180.0, costPrice: 140.0, currentStock: 100.0, minimumStock: 15.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-03', name: 'Siraga Samba – Semi Polished', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 160.0, costPrice: 125.0, currentStock: 150.0, minimumStock: 20.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-04', name: 'Siraga Samba – Unpolished', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 170.0, costPrice: 130.0, currentStock: 120.0, minimumStock: 20.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-05', name: 'Mapillai Samba', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 140.0, costPrice: 110.0, currentStock: 150.0, minimumStock: 20.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-06', name: 'Karunguruvai Rice', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 150.0, costPrice: 115.0, currentStock: 100.0, minimumStock: 15.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-07', name: 'Angur Sanna', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 110.0, costPrice: 85.0, currentStock: 100.0, minimumStock: 15.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-08', name: 'Mysore Malli Rice', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 130.0, costPrice: 100.0, currentStock: 100.0, minimumStock: 15.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-09', name: 'Thuvaram Paruppu', categoryId: 'cat-rice', brand: 'Traditional', unit: 'kg', sellingPrice: 190.0, costPrice: 155.0, currentStock: 80.0, minimumStock: 10.0, categoryName: 'Rice & Cereals', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-
-    // Soaps
-    ProductModel(id: 'prod-10', name: 'Vetiver Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 80.0, costPrice: 55.0, currentStock: 100.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-11', name: 'Charcoal Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 80.0, costPrice: 55.0, currentStock: 75.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-12', name: 'Veepilai Manjal Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 80.0, costPrice: 55.0, currentStock: 60.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-13', name: 'Kasthuri Manjal Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 80.0, costPrice: 55.0, currentStock: 60.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-14', name: 'Multani Mitti Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 80.0, costPrice: 55.0, currentStock: 50.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-15', name: 'Kuppaimeni Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 80.0, costPrice: 55.0, currentStock: 70.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-16', name: 'Aloevera Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 80.0, costPrice: 55.0, currentStock: 80.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-17', name: 'Red Wine Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 95.0, costPrice: 65.0, currentStock: 40.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-18', name: 'Sandal Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 85.0, costPrice: 60.0, currentStock: 90.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-19', name: 'Goat Milk Soap', categoryId: 'cat-mercury', subcategoryId: 'sub-soaps', brand: 'Mercury Naturals', unit: 'piece', sellingPrice: 90.0, costPrice: 60.0, currentStock: 50.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Soaps', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-
-    // Hair Care
-    ProductModel(id: 'prod-20', name: 'Mulugi Hair Oil', categoryId: 'cat-mercury', subcategoryId: 'sub-haircare', brand: 'Mercury Naturals', unit: 'bottle', sellingPrice: 180.0, costPrice: 130.0, currentStock: 40.0, minimumStock: 8.0, categoryName: 'Mercury Naturals', subcategoryName: 'Hair Care', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-21', name: 'Karum Siraga Hair Oil', categoryId: 'cat-mercury', subcategoryId: 'sub-haircare', brand: 'Mercury Naturals', unit: 'bottle', sellingPrice: 190.0, costPrice: 135.0, currentStock: 35.0, minimumStock: 8.0, categoryName: 'Mercury Naturals', subcategoryName: 'Hair Care', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-22', name: 'Hair Dye', categoryId: 'cat-mercury', subcategoryId: 'sub-haircare', brand: 'Mercury Naturals', unit: 'packet', sellingPrice: 120.0, costPrice: 85.0, currentStock: 50.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Hair Care', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-23', name: 'Sembaruthi Shampoo', categoryId: 'cat-mercury', subcategoryId: 'sub-haircare', brand: 'Mercury Naturals', unit: 'bottle', sellingPrice: 150.0, costPrice: 105.0, currentStock: 50.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Hair Care', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-24', name: 'Aloevera Shampoo', categoryId: 'cat-mercury', subcategoryId: 'sub-haircare', brand: 'Mercury Naturals', unit: 'bottle', sellingPrice: 150.0, costPrice: 105.0, currentStock: 45.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Hair Care', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-25', name: 'Karusilakanni Shampoo', categoryId: 'cat-mercury', subcategoryId: 'sub-haircare', brand: 'Mercury Naturals', unit: 'bottle', sellingPrice: 160.0, costPrice: 110.0, currentStock: 40.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Hair Care', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-26', name: 'Sikakai Shampoo', categoryId: 'cat-mercury', subcategoryId: 'sub-haircare', brand: 'Mercury Naturals', unit: 'bottle', sellingPrice: 150.0, costPrice: 105.0, currentStock: 50.0, minimumStock: 10.0, categoryName: 'Mercury Naturals', subcategoryName: 'Hair Care', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-
-    // Cleaning Products
-    ProductModel(id: 'prod-27', name: 'Dishwashing Liquid', categoryId: 'cat-mercury', subcategoryId: 'sub-cleaning', brand: 'Mercury Naturals', unit: 'bottle', sellingPrice: 90.0, costPrice: 60.0, currentStock: 60.0, minimumStock: 12.0, categoryName: 'Mercury Naturals', subcategoryName: 'Cleaning Products', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
-    ProductModel(id: 'prod-28', name: 'Cloth Washing Liquid', categoryId: 'cat-mercury', subcategoryId: 'sub-cleaning', brand: 'Mercury Naturals', unit: 'bottle', sellingPrice: 110.0, costPrice: 75.0, currentStock: 50.0, minimumStock: 12.0, categoryName: 'Mercury Naturals', subcategoryName: 'Cleaning Products', createdAt: DateTime(2026, 1, 1), updatedAt: DateTime(2026, 1, 1)),
+  // Test fallback products with valid UUIDs for offline unit tests
+  static final List<ProductModel> testFallbackProducts = [
+    ProductModel(
+      id: '00000000-0000-0000-0002-000000000001',
+      name: 'Thuyamali Rice',
+      categoryId: '00000000-0000-0000-0001-000000000001',
+      brand: 'Traditional',
+      unit: 'kg',
+      sellingPrice: 120.0,
+      costPrice: 95.0,
+      currentStock: 200.0,
+      minimumStock: 25.0,
+      categoryName: 'Rice & Cereals',
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+    ),
+    ProductModel(
+      id: '00000000-0000-0000-0002-000000000010',
+      name: 'Vetiver Soap',
+      categoryId: '00000000-0000-0000-0001-000000000002',
+      brand: 'Mercury Naturals',
+      unit: 'piece',
+      sellingPrice: 80.0,
+      costPrice: 55.0,
+      currentStock: 100.0,
+      minimumStock: 10.0,
+      categoryName: 'Mercury Naturals',
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+    ),
   ];
 
-  final List<ProductModel> _products = List.from(initialProducts);
-  final List<CategoryModel> _categories = List.from(initialCategories);
+  final List<ProductModel> _products = [];
+  final List<CategoryModel> _categories = [];
 
   final _productsController = StreamController<List<ProductModel>>.broadcast();
   final _categoriesController = StreamController<List<CategoryModel>>.broadcast();
 
   ProductRepository() {
-    _initSupabaseSync();
+    final client = SupabaseService.client;
+    if (client != null) {
+      _initSupabaseSync();
+      getProducts();
+      getCategories();
+    } else if (kDebugMode) {
+      _products.addAll(testFallbackProducts);
+      _categories.addAll(testFallbackCategories);
+    }
   }
 
   void _initSupabaseSync() {
@@ -99,7 +97,6 @@ class ProductRepository {
   }
 
   Stream<List<ProductModel>> get productsStream {
-    // Emit current list first
     Timer.run(() => _productsController.add(List.unmodifiable(_products)));
     return _productsController.stream;
   }
@@ -173,7 +170,7 @@ class ProductRepository {
     }
 
     final localProduct = product.copyWith(
-      id: 'prod-${_uuid.v4().substring(0, 8)}',
+      id: _uuid.v4(),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -243,7 +240,7 @@ class ProductRepository {
     }
 
     final cat = CategoryModel(
-      id: 'cat-${_uuid.v4().substring(0, 8)}',
+      id: _uuid.v4(),
       name: name,
       parentId: parentId,
       createdAt: DateTime.now(),

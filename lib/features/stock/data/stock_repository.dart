@@ -14,42 +14,11 @@ class StockRepository {
   final _movementsController = StreamController<List<StockMovementModel>>.broadcast();
 
   StockRepository(this._productRepo) {
-    if (kDebugMode) {
-      _seedInitialMovements();
+    final client = SupabaseService.client;
+    if (client != null) {
+      _initSupabaseSync();
+      getMovements();
     }
-    _initSupabaseSync();
-  }
-
-  void _seedInitialMovements() {
-    final now = DateTime.now();
-    _movements.addAll([
-      StockMovementModel(
-        id: 'mov-1',
-        productId: 'prod-01',
-        movementType: 'opening_stock',
-        quantity: 200.0,
-        balanceAfter: 200.0,
-        reason: 'Initial Opening Stock from BPD Catalog',
-        performedBy: '00000000-0000-0000-0000-000000000001',
-        performedByName: 'Admin',
-        productName: 'Thuyamali Rice',
-        unit: 'kg',
-        createdAt: now.subtract(const Duration(days: 2)),
-      ),
-      StockMovementModel(
-        id: 'mov-2',
-        productId: 'prod-10',
-        movementType: 'opening_stock',
-        quantity: 100.0,
-        balanceAfter: 100.0,
-        reason: 'Initial Opening Stock from BPD Catalog',
-        performedBy: '00000000-0000-0000-0000-000000000001',
-        performedByName: 'Admin',
-        productName: 'Vetiver Soap',
-        unit: 'piece',
-        createdAt: now.subtract(const Duration(days: 2)),
-      ),
-    ]);
   }
 
   void _initSupabaseSync() {
@@ -142,13 +111,13 @@ class StockRepository {
       throw Exception('Unauthorized: User must be signed in as Admin.');
     }
 
-    // Local in-memory execution
+    // Local in-memory execution for offline test suite
     await _productRepo.updateStockDirectly(productId, quantity);
     final products = await _productRepo.getProducts();
     final product = products.firstWhere((p) => p.id == productId);
 
     final movement = StockMovementModel(
-      id: 'mov-${_uuid.v4().substring(0, 8)}',
+      id: _uuid.v4(),
       productId: productId,
       movementType: 'purchase',
       quantity: quantity,
@@ -203,13 +172,13 @@ class StockRepository {
       throw Exception('Unauthorized: User must be signed in as Admin.');
     }
 
-    // Local in-memory execution
+    // Local in-memory execution for offline test suite
     await _productRepo.updateStockDirectly(productId, adjustmentDelta);
     final products = await _productRepo.getProducts();
     final product = products.firstWhere((p) => p.id == productId);
 
     final movement = StockMovementModel(
-      id: 'mov-${_uuid.v4().substring(0, 8)}',
+      id: _uuid.v4(),
       productId: productId,
       movementType: 'adjustment',
       quantity: adjustmentDelta,

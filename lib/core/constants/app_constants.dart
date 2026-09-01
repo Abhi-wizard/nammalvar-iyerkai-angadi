@@ -2,9 +2,10 @@ class AppConstants {
   static const String appName = 'Nammalvar Iyerkai Angadi';
   static const String appTagline = 'இயற்கை அங்காடி • Pure & Traditional';
 
-  // Supabase Config Keys (Can also be overridden via runtime or dart-define)
-  static const String defaultSupabaseUrl = 'https://your-project.supabase.co';
-  static const String defaultSupabaseAnonKey = 'your-anon-key';
+  // Supabase Config Keys
+  static const String defaultSupabaseUrl = 'https://snxltzbkkdghmaggzhdh.supabase.co';
+  static const String defaultSupabaseAnonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNueGx0emJra2RnaG1hZ2d6aGRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNjM1MTUsImV4cCI6MjEwMzczOTUxNX0.ym2E-xqYyqfwE6zCFuuGfvNHvDbmakPoen_1TsncJh0';
 
   // Currency
   static const String currencySymbol = '₹';

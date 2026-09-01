@@ -16,73 +16,11 @@ class SalesRepository {
   int _localSaleSequence = 1001;
 
   SalesRepository(this._productRepo) {
-    if (kDebugMode) {
-      _seedInitialSales();
+    final client = SupabaseService.client;
+    if (client != null) {
+      _initSupabaseSync();
+      getSales();
     }
-    _initSupabaseSync();
-  }
-
-  void _seedInitialSales() {
-    final now = DateTime.now();
-    _sales.add(
-      SaleModel(
-        id: 'sale-1001',
-        saleNumber: 1001,
-        sellerId: '00000000-0000-0000-0000-000000000002',
-        sellerName: 'Seller 1 (Murugan)',
-        saleDate: now.subtract(const Duration(hours: 3)),
-        totalAmount: 300.0,
-        totalCostAmount: 210.0,
-        paymentMethod: 'cash',
-        status: 'completed',
-        createdAt: now.subtract(const Duration(hours: 3)),
-        items: [
-          SaleItemModel(
-            id: 'item-1',
-            saleId: 'sale-1001',
-            productId: 'prod-23',
-            productNameSnapshot: 'Sembaruthi Shampoo',
-            unitSnapshot: 'bottle',
-            quantity: 2.0,
-            rateSnapshot: 150.0,
-            costPriceSnapshot: 105.0,
-            amount: 300.0,
-            createdAt: now.subtract(const Duration(hours: 3)),
-          ),
-        ],
-      ),
-    );
-
-    _sales.add(
-      SaleModel(
-        id: 'sale-1002',
-        saleNumber: 1002,
-        sellerId: '00000000-0000-0000-0000-000000000003',
-        sellerName: 'Seller 2 (Kavitha)',
-        saleDate: now.subtract(const Duration(hours: 2)),
-        totalAmount: 240.0,
-        totalCostAmount: 165.0,
-        paymentMethod: 'upi',
-        status: 'completed',
-        createdAt: now.subtract(const Duration(hours: 2)),
-        items: [
-          SaleItemModel(
-            id: 'item-2',
-            saleId: 'sale-1002',
-            productId: 'prod-10',
-            productNameSnapshot: 'Vetiver Soap',
-            unitSnapshot: 'piece',
-            quantity: 3.0,
-            rateSnapshot: 80.0,
-            costPriceSnapshot: 55.0,
-            amount: 240.0,
-            createdAt: now.subtract(const Duration(hours: 2)),
-          ),
-        ],
-      ),
-    );
-
-    _localSaleSequence = 1003;
   }
 
   void _initSupabaseSync() {
@@ -160,7 +98,21 @@ class SalesRepository {
         await _productRepo.refreshProducts();
         await refreshSales();
 
-        return _sales.firstWhere((s) => s.id == saleId.toString());
+        return _sales.firstWhere(
+          (s) => s.id == saleId.toString(),
+          orElse: () => SaleModel(
+            id: saleId.toString(),
+            saleNumber: 0,
+            sellerId: client.auth.currentUser!.id,
+            sellerName: 'Seller',
+            saleDate: DateTime.now(),
+            totalAmount: cartItems.fold(0.0, (acc, item) => acc + item.amount),
+            paymentMethod: paymentMethod,
+            status: 'completed',
+            createdAt: DateTime.now(),
+            items: [],
+          ),
+        );
       } catch (e) {
         debugPrint('Supabase process_sale error: $e');
         rethrow;
@@ -171,14 +123,14 @@ class SalesRepository {
       throw Exception('Unauthorized: User must be signed in to perform sales.');
     }
 
-    // Local / Debug mode fallback
+    // Local / Offline unit test mode fallback
     final sellerId = fallbackSellerId ?? '00000000-0000-0000-0000-000000000002';
-    final sellerName = fallbackSellerName ?? 'Debug Seller';
+    final sellerName = fallbackSellerName ?? 'Test Seller';
 
     double totalAmount = 0;
     double totalCost = 0;
     final List<SaleItemModel> saleItems = [];
-    final saleId = 'sale-$_localSaleSequence';
+    final saleId = _uuid.v4();
 
     for (final item in cartItems) {
       if (item.product.currentStock < item.quantity) {
@@ -192,7 +144,7 @@ class SalesRepository {
 
       saleItems.add(
         SaleItemModel(
-          id: 'item-${_uuid.v4().substring(0, 8)}',
+          id: _uuid.v4(),
           saleId: saleId,
           productId: item.product.id,
           productNameSnapshot: item.product.name,

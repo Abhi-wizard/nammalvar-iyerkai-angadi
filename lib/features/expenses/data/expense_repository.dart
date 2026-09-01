@@ -11,34 +11,11 @@ class ExpenseRepository {
   final _expensesController = StreamController<List<ExpenseModel>>.broadcast();
 
   ExpenseRepository() {
-    _seedInitialExpenses();
-    _initSupabaseSync();
-  }
-
-  void _seedInitialExpenses() {
-    final now = DateTime.now();
-    _expenses.addAll([
-      ExpenseModel(
-        id: 'exp-1',
-        category: 'Transport',
-        description: 'Rice delivery from farm / warehouse',
-        amount: 500.0,
-        expenseDate: now,
-        createdBy: '00000000-0000-0000-0000-000000000001',
-        createdByName: 'Admin',
-        createdAt: now.subtract(const Duration(hours: 4)),
-      ),
-      ExpenseModel(
-        id: 'exp-2',
-        category: 'Packaging',
-        description: 'Cloth bags & paper packaging rolls',
-        amount: 350.0,
-        expenseDate: now,
-        createdBy: '00000000-0000-0000-0000-000000000001',
-        createdByName: 'Admin',
-        createdAt: now.subtract(const Duration(hours: 1)),
-      ),
-    ]);
+    final client = SupabaseService.client;
+    if (client != null) {
+      _initSupabaseSync();
+      getExpenses();
+    }
   }
 
   void _initSupabaseSync() {
@@ -65,7 +42,7 @@ class ExpenseRepository {
 
   Future<List<ExpenseModel>> getExpenses() async {
     final client = SupabaseService.client;
-    if (client != null) {
+    if (client != null && client.auth.currentSession != null) {
       try {
         final res = await client
             .from('expenses')
@@ -125,7 +102,7 @@ class ExpenseRepository {
     }
 
     final localExp = ExpenseModel(
-      id: 'exp-${_uuid.v4().substring(0, 8)}',
+      id: _uuid.v4(),
       category: category,
       description: description,
       amount: amount,

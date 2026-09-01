@@ -22,6 +22,11 @@ class Formatters {
     return _compactCurrencyFormat.format(amount);
   }
 
+  static String pdfCurrency(num? amount) {
+    if (amount == null) return 'Rs. 0.00';
+    return _currencyFormat.format(amount).replaceAll('₹', 'Rs. ');
+  }
+
   static String formatQuantity(num? quantity, String unit) {
     if (quantity == null) return '0 $unit';
     // If quantity is whole number, format without decimals, else with up to 3 decimals
