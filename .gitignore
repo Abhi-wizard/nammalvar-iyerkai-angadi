@@ -46,3 +46,26 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+*.env
+
+# Supabase CLI Temporary State
+supabase/.temp/
+
+# Android / iOS Signing & Keystores
+*.jks
+*.keystore
+*.key
+*.pem
+*.p12
+key.properties
+
+# Exported Local Reports & Temporary Test Outputs
+Daily_Store_Audit_*.xlsx
+*.xlsx
+*.pdf
+
